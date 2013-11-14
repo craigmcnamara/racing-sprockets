@@ -12,7 +12,6 @@ Sprockets::Manifest.class_eval do
   end
 
   def compile(*args)
-    pool = Thread.pool(10)
     unless environment
       raise Error, "manifest requires environment for compilation"
     end
@@ -20,8 +19,10 @@ Sprockets::Manifest.class_eval do
     paths = environment.each_logical_path(*args).to_a +
       args.flatten.select { |fn| Pathname.new(fn).absolute? if fn.is_a?(String)}
 
+    thread_pool = Thread.pool(10)
+
     paths.each do |path|
-      pool.process do
+      thread_pool.process do
         if asset = find_asset(path)
           files[asset.digest_path] = {
             'logical_path' => asset.logical_path,
@@ -43,7 +44,8 @@ Sprockets::Manifest.class_eval do
         end
       end
     end
-    pool.shutdown
+    thread_pool.wait_done
+
     save
     paths
   end
